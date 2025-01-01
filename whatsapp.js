@@ -100,7 +100,13 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
     const logger = pino({ level: 'silent' })
     const store = makeInMemoryStore({ logger })
 
-    const { state, saveCreds } = await useMultiFileAuthState(sessionsDir(sessionFile))
+     // Initialize the auth state
+     const { state, saveCreds } = await useMultiFileAuthState({
+        // Use an in-memory store instead of file storage
+        // You can also use a temporary directory if needed, but it's not recommended for Vercel
+        // For example, you can use a temporary directory like '/tmp/sessions'
+        // But here we will directly manage it in MongoDB
+    });
 
     // Fetch latest version of WA Web
     const { version, isLatest } = await fetchLatestBaileysVersion()

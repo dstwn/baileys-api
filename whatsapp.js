@@ -37,7 +37,7 @@ let db;
 // Initialize MongoDB connection
 const initDB = async () => {
     try {
-        client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+        client = new MongoClient(uri);
         await client.connect();
         console.log('Connected to MongoDB');
         db = client.db('wa-api'); // Replace with your database name

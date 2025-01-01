@@ -101,10 +101,10 @@ const webhook = async (instance, type, data) => {
 }
 
 const createSession = async (sessionId, res = null, options = { usePairingCode: false, phoneNumber: '' }) => {
-    if (!db) {
-        console.error('Database connection is not established.');
-        return response(res, 500, false, 'Database connection is not established.');
-    }
+    // if (!db) {
+    //     console.error('Database connection is not established.');
+    //     return response(res, 500, false, 'Database connection is not established.');
+    // }
 
     const logger = pino({ level: 'silent' })
     const store = makeInMemoryStore({ logger })

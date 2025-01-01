@@ -101,7 +101,10 @@ const webhook = async (instance, type, data) => {
 }
 
 const createSession = async (sessionId, res = null, options = { usePairingCode: false, phoneNumber: '' }) => {
-    // const sessionFile = 'md_' + sessionId
+    if (!db) {
+        console.error('Database connection is not established.');
+        return response(res, 500, false, 'Database connection is not established.');
+    }
 
     const logger = pino({ level: 'silent' })
     const store = makeInMemoryStore({ logger })
@@ -637,11 +640,15 @@ const convertToBase64 = (arrayBytes) => {
 }
 
 const init = async () => {
-    await initDB(); // Initialize the database connection
-    const storedSessions = await db.collection('sessions').find().toArray();
-    for (const session of storedSessions) {
-        console.log('Recovering session: ' + session.sessionId);
-        createSession(session.sessionId);
+    try {
+        await initDB(); // Initialize the database connection
+        const storedSessions = await db.collection('sessions').find().toArray();
+        for (const session of storedSessions) {
+            console.log('Recovering session: ' + session.sessionId);
+            await createSession(session.sessionId); // Ensure to await here
+        }
+    } catch (error) {
+        console.error('Error during initialization:', error);
     }
 }
 

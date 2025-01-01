@@ -123,10 +123,12 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
     // store?.readFromFile(sessionsDir(`${sessionId}_store.json`))
 
     // Save every 10s
-    setInterval(() => {
-        if (existsSync(sessionsDir(sessionFile))) {
-            store?.writeToFile(sessionsDir(`${sessionId}_store.json`))
-        }
+    setInterval(async () => {
+        await db.collection('sessions').updateOne(
+            { sessionId },
+            { $set: { state } },
+            { upsert: true }
+        );
     }, 10000)
 
     /**

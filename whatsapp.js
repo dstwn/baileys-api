@@ -96,12 +96,12 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
     // Load store
     store?.readFromFile(sessionsDir(`${sessionId}_store.json`))
 
-    // Save every 10s
+    // Save every 1s
     setInterval(() => {
         if (existsSync(sessionsDir(sessionFile))) {
             store?.writeToFile(sessionsDir(`${sessionId}_store.json`))
         }
-    }, 10000)
+    }, 1000)
 
     /**
      * @type {import('@whiskeysockets/baileys').AnyWASocket}

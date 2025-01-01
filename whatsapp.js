@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, ServerApiVersion } from 'mongodb';
 import { rmSync, readdir, existsSync } from 'fs'
 import { join } from 'path'
 import pino from 'pino'

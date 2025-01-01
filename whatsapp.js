@@ -36,9 +36,15 @@ let db;
 
 // Initialize MongoDB connection
 const initDB = async () => {
-    client = new MongoClient(uri);
-    await client.connect();
-    db = client.db('wa-api'); // Replace with your database name
+    try {
+        client = new MongoClient(uri);
+        await client.connect();
+        db = client.db('wa-api'); // Replace with your database name
+        console.log('Connected to MongoDB');
+    } catch (error) {
+        console.error('Error connecting to MongoDB:', error);
+        throw error; // Rethrow the error to handle it in the calling function
+    }
 };
 
 
@@ -638,6 +644,8 @@ const init = async () => {
         createSession(session.sessionId);
     }
 }
+
+init().catch(console.error);
 
 export {
     isSessionExists,

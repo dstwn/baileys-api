@@ -37,13 +37,7 @@ let db;
 // Initialize MongoDB connection
 const initDB = async () => {
     try {
-        client = new MongoClient(uri, {
-            serverApi: {
-              version: ServerApiVersion.v1,
-              strict: true,
-              deprecationErrors: true,
-            }
-          });
+        client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
         await client.connect();
         console.log('Connected to MongoDB');
         db = client.db('wa-api'); // Replace with your database name
@@ -662,7 +656,7 @@ const init = async () => {
         console.error('Error during initialization:', error);
     }
 }
-
+initDB().catch(console.error);
 init().catch(console.error);
 
 export {

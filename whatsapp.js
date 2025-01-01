@@ -30,7 +30,7 @@ const retries = new Map()
 const APP_WEBHOOK_ALLOWED_EVENTS = process.env.APP_WEBHOOK_ALLOWED_EVENTS.split(',')
 
 const sessionsDir = (sessionId = '') => {
-    return join(process.cwd(), 'sessions', sessionId ? sessionId : '')
+    return join('/tmp', 'sessions', sessionId ? sessionId : '')
 }
 
 const isSessionExists = (sessionId) => {

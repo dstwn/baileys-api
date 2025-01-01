@@ -127,6 +127,8 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
         state.keys = storedSession.state.keys;
     }
 
+    console.log('State before creating socket:', state); // Debugging log
+
     // Load store
     // store?.readFromFile(sessionsDir(`${sessionId}_store.json`))
 

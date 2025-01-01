@@ -37,6 +37,7 @@ let db;
 // Initialize MongoDB connection
 const initDB = async () => {
     try {
+        console.log('Connecting to MongoDB:', uri);
         client = new MongoClient(uri);
         await client.connect();
         console.log('Connected to MongoDB');

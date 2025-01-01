@@ -114,8 +114,10 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
     const logger = pino({ level: 'silent' })
     const store = makeInMemoryStore({ logger })
 
-    const { state, saveCreds } = await useMultiFileAuthState(sessionsDir(sessionFile))
-
+    let state = {
+        creds: {},
+        keys: {},
+    };
     // Fetch latest version of WA Web
     const { version, isLatest } = await fetchLatestBaileysVersion()
     console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)

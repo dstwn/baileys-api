@@ -30,7 +30,7 @@ const retries = new Map()
 
 const APP_WEBHOOK_ALLOWED_EVENTS = process.env.APP_WEBHOOK_ALLOWED_EVENTS.split(',')
 
-const uri = process.env.MONGODB_URI; // Your MongoDB connection string
+const uri = process.env.MONGODB_URI  + '&connectTimeoutMS=30000&socketTimeoutMS=45000';
 let client;
 let db;
 

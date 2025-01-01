@@ -39,6 +39,7 @@ const initDB = async () => {
     try {
         console.log('Connecting to MongoDB:', uri);
         client = new MongoClient(uri);
+        console.log('Client created:', client);
         await client.connect();
         console.log('Connected to MongoDB');
         db = client.db('wa-api'); // Replace with your database name
@@ -104,10 +105,10 @@ const webhook = async (instance, type, data) => {
 
 const createSession = async (sessionId, res = null, options = { usePairingCode: false, phoneNumber: '' }) => {
     // Check if the database connection is established
-    // if (!db) {
-    //     console.error('Database connection is not established.');
-    //     return response(res, 500, false, 'Database connection is not established. : ' + db);
-    // }
+    if (!db) {
+        console.error('Database connection is not established.');
+        return response(res, 500, false, 'Database connection is not established.');
+    }
 
 
     const logger = pino({ level: 'silent' })

@@ -19,8 +19,14 @@ init()
 
 // Export the Express app as a serverless function
 export default (req, res) => {
+    console.log('Received request')
     app(req, res)
 }
+
+// Start the server
+// app.listen(port, () => {
+//     console.log(`Server is running on port ${port}`)
+// })
 
 // Cleanup on exit
 nodeCleanup(cleanup)

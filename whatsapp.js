@@ -95,18 +95,14 @@ const webhook = async (instance, type, data) => {
 }
 
 const createSession = async (sessionId, res = null, options = { usePairingCode: false, phoneNumber: '' }) => {
-    const sessionFile = 'md_' + sessionId
+    // const sessionFile = 'md_' + sessionId
 
     const logger = pino({ level: 'silent' })
     const store = makeInMemoryStore({ logger })
-
-     // Initialize the auth state
-     const { state, saveCreds } = await useMultiFileAuthState({
-        // Use an in-memory store instead of file storage
-        // You can also use a temporary directory if needed, but it's not recommended for Vercel
-        // For example, you can use a temporary directory like '/tmp/sessions'
-        // But here we will directly manage it in MongoDB
-    });
+    let state = {
+        creds: {},
+        keys: {},
+    };
 
     // Fetch latest version of WA Web
     const { version, isLatest } = await fetchLatestBaileysVersion()

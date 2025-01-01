@@ -54,12 +54,12 @@ const downloadFromSupabase = async (key) => {
         .download(key);
 
     if (error) {
+        console.log('Error data:', data);
         console.log('Error downloading session from Supabase:', error);
         throw error;
     }
-
-    const text = await data.text();
-    return JSON.parse(text);
+    console.log('Data:', data);
+    return data;
 };
 
 const isSessionExists = (sessionId) => {

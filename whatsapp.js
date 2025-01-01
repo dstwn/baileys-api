@@ -43,6 +43,7 @@ const uploadToSupabase = async (key, data) => {
         });
 
     if (error) {
+        console.log('Error uploading session to Supabase:', error);
         throw error;
     }
 };
@@ -53,6 +54,7 @@ const downloadFromSupabase = async (key) => {
         .download(key);
 
     if (error) {
+        console.log('Error downloading session from Supabase:', error);
         throw error;
     }
 

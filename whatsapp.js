@@ -1,4 +1,3 @@
-import { MongoClient, ServerApiVersion } from 'mongodb';
 import { rmSync, readdir, existsSync } from 'fs'
 import { join } from 'path'
 import pino from 'pino'
@@ -29,27 +28,6 @@ const sessions = new Map()
 const retries = new Map()
 
 const APP_WEBHOOK_ALLOWED_EVENTS = process.env.APP_WEBHOOK_ALLOWED_EVENTS.split(',')
-
-const uri = process.env.MONGODB_URI  + '&connectTimeoutMS=30000&socketTimeoutMS=45000';
-let client;
-let db;
-
-// Initialize MongoDB connection
-const initDB = async () => {
-    try {
-        console.log('Connecting to MongoDB:', uri);
-        client = new MongoClient(uri);
-        console.log('Client created:', client);
-        await client.connect();
-        console.log('Connected to MongoDB');
-        db = client.db('wa-api'); // Replace with your database name
-        console.log('Database connected:', db.databaseName);
-    } catch (error) {
-        console.error('Error connecting to MongoDB:', error);
-        throw error; // Rethrow the error to handle it in the calling function
-    }
-};
-
 
 const sessionsDir = (sessionId = '') => {
     return join(__dirname, 'sessions', sessionId ? sessionId : '')
@@ -104,43 +82,25 @@ const webhook = async (instance, type, data) => {
 }
 
 const createSession = async (sessionId, res = null, options = { usePairingCode: false, phoneNumber: '' }) => {
-    // Check if the database connection is established
-    if (!db) {
-        console.error('Database connection is not established.');
-        return response(res, 500, false, 'Database connection is not established.');
-    }
-
+    const sessionFile = 'md_' + sessionId
 
     const logger = pino({ level: 'silent' })
     const store = makeInMemoryStore({ logger })
-    let state = {
-        creds: {},
-        keys: {},
-    };
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionsDir(sessionFile))
 
     // Fetch latest version of WA Web
     const { version, isLatest } = await fetchLatestBaileysVersion()
     console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
 
-    const storedSession = await db.collection('sessions').findOne({ sessionId });
-    if (storedSession) {
-        // Restore session state from MongoDB
-        state.creds = storedSession.state.creds;
-        state.keys = storedSession.state.keys;
-    }
-
-    console.log('State before creating socket:', state); // Debugging log
-
     // Load store
-    // store?.readFromFile(sessionsDir(`${sessionId}_store.json`))
+    store?.readFromFile(sessionsDir(`${sessionId}_store.json`))
 
     // Save every 10s
-    setInterval(async () => {
-        await db.collection('sessions').updateOne(
-            { sessionId },
-            { $set: { state } },
-            { upsert: true }
-        );
+    setInterval(() => {
+        if (existsSync(sessionsDir(sessionFile))) {
+            store?.writeToFile(sessionsDir(`${sessionId}_store.json`))
+        }
     }, 10000)
 
     /**
@@ -178,14 +138,7 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
         }
     }
 
-    wa.ev.on('creds.update', async () => {
-        await db.collection('sessions').updateOne(
-            { sessionId },
-            { $set: { state } },
-            { upsert: true }
-        );
-        saveCreds();
-    });
+    wa.ev.on('creds.update', saveCreds)
 
     wa.ev.on('chats.set', ({ chats }) => {
         callWebhook(sessionId, 'CHATS_SET', chats)
@@ -435,19 +388,16 @@ const getListSessions = () => {
     return [...sessions.keys()]
 }
 
-const deleteSession = async (sessionId) => {
-    await db.collection('sessions').deleteOne({ sessionId });
-    sessions.delete(sessionId);
-    retries.delete(sessionId);
-    // const sessionFile = 'md_' + sessionId
-    // const storeFile = `${sessionId}_store.json`
-    // const rmOptions = { force: true, recursive: true }
+const deleteSession = (sessionId) => {
+    const sessionFile = 'md_' + sessionId
+    const storeFile = `${sessionId}_store.json`
+    const rmOptions = { force: true, recursive: true }
 
-    // rmSync(sessionsDir(sessionFile), rmOptions)
-    // rmSync(sessionsDir(storeFile), rmOptions)
+    rmSync(sessionsDir(sessionFile), rmOptions)
+    rmSync(sessionsDir(storeFile), rmOptions)
 
-    // sessions.delete(sessionId)
-    // retries.delete(sessionId)
+    sessions.delete(sessionId)
+    retries.delete(sessionId)
 }
 
 const getChatList = (sessionId, isGroup = false) => {
@@ -646,20 +596,24 @@ const convertToBase64 = (arrayBytes) => {
     return Buffer.from(byteArray).toString('base64')
 }
 
-const init = async () => {
-    try {
-        await initDB(); // Initialize the database connection
-        const storedSessions = await db.collection('sessions').find().toArray();
-        for (const session of storedSessions) {
-            console.log('Recovering session: ' + session.sessionId);
-            await createSession(session.sessionId); // Ensure to await here
+const init = () => {
+    readdir(sessionsDir(), (err, files) => {
+        if (err) {
+            throw err
         }
-    } catch (error) {
-        console.error('Error during initialization:', error);
-    }
+
+        for (const file of files) {
+            if ((!file.startsWith('md_') && !file.startsWith('legacy_')) || file.endsWith('_store')) {
+                continue
+            }
+
+            const filename = file.replace('.json', '')
+            const sessionId = filename.substring(3)
+            console.log('Recovering session: ' + sessionId)
+            createSession(sessionId)
+        }
+    })
 }
-initDB().catch(console.error);
-init().catch(console.error);
 
 export {
     isSessionExists,

@@ -36,7 +36,7 @@ const sessionsDir = (sessionId = '') => {
 
 const uploadToSupabase = async (key, data) => {
     const { error } = await supabase.storage
-        .from('sessions')
+        .from('wa-api')
         .upload(key, JSON.stringify(data), {
             contentType: 'application/json',
             upsert: true,
@@ -49,7 +49,7 @@ const uploadToSupabase = async (key, data) => {
 
 const downloadFromSupabase = async (key) => {
     const { data, error } = await supabase.storage
-        .from('sessions')
+        .from('wa-api')
         .download(key);
 
     if (error) {

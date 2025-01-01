@@ -1,5 +1,4 @@
 import { rmSync, readdir, existsSync } from 'fs'
-import supabase from './supabaseClient.js';
 import { join } from 'path'
 import pino from 'pino'
 import makeWASocket, {
@@ -31,36 +30,8 @@ const retries = new Map()
 const APP_WEBHOOK_ALLOWED_EVENTS = process.env.APP_WEBHOOK_ALLOWED_EVENTS.split(',')
 
 const sessionsDir = (sessionId = '') => {
-    return `sessions/${sessionId ? sessionId : ''}`;
-};
-
-const uploadToSupabase = async (key, data) => {
-    const { error } = await supabase.storage
-        .from('wa-api')
-        .upload(key, JSON.stringify(data), {
-            contentType: 'application/json',
-            upsert: true,
-        });
-
-    if (error) {
-        console.log('Error uploading session to Supabase:', error);
-        throw error;
-    }
-};
-
-const downloadFromSupabase = async (key) => {
-    const { data, error } = await supabase.storage
-        .from('wa-api')
-        .download(key);
-
-    if (error) {
-        console.log('Error data:', data);
-        console.log('Error downloading session from Supabase:', error);
-        throw error;
-    }
-    console.log('Data:', data);
-    return data;
-};
+    return join(__dirname, 'sessions', sessionId ? sessionId : '')
+}
 
 const isSessionExists = (sessionId) => {
     return sessions.has(sessionId)
@@ -116,31 +87,21 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
     const logger = pino({ level: 'silent' })
     const store = makeInMemoryStore({ logger })
 
-    let state = {
-        creds: {},
-        keys: {},
-    };
+    const { state, saveCreds } = await useMultiFileAuthState(sessionsDir(sessionFile))
+
     // Fetch latest version of WA Web
     const { version, isLatest } = await fetchLatestBaileysVersion()
     console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
 
-    try {
-        const storedSession = await downloadFromSupabase(sessionsDir(sessionId));
-        if (storedSession) {
-            // Restore session state from Supabase
-            state = storedSession;
-        }
-    } catch (error) {
-        console.error('Error downloading session from Supabase:', error);
-    }
-
-    console.log('State before creating socket:', state); // Debugging log
+    // Load store
+    store?.readFromFile(sessionsDir(`${sessionId}_store.json`))
 
     // Save every 10s
-    setInterval(async () => {
-        await uploadToSupabase(sessionsDir(sessionId), state);
-    }, 1000);
-
+    setInterval(() => {
+        if (existsSync(sessionsDir(sessionFile))) {
+            store?.writeToFile(sessionsDir(`${sessionId}_store.json`))
+        }
+    }, 10000)
 
     /**
      * @type {import('@whiskeysockets/baileys').AnyWASocket}
@@ -177,9 +138,7 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
         }
     }
 
-    wa.ev.on('creds.update', async () => {
-        await uploadToSupabase(sessionsDir(sessionId), state);
-    });
+    wa.ev.on('creds.update', saveCreds)
 
     wa.ev.on('chats.set', ({ chats }) => {
         callWebhook(sessionId, 'CHATS_SET', chats)
@@ -429,18 +388,17 @@ const getListSessions = () => {
     return [...sessions.keys()]
 }
 
-const deleteSession = async (sessionId) => {
-    const { error } = await supabase.storage
-        .from('sessions')
-        .remove([sessionsDir(sessionId)]);
+const deleteSession = (sessionId) => {
+    const sessionFile = 'md_' + sessionId
+    const storeFile = `${sessionId}_store.json`
+    const rmOptions = { force: true, recursive: true }
 
-    if (error) {
-        throw error;
-    }
+    rmSync(sessionsDir(sessionFile), rmOptions)
+    rmSync(sessionsDir(storeFile), rmOptions)
 
-    sessions.delete(sessionId);
-    retries.delete(sessionId);
-};
+    sessions.delete(sessionId)
+    retries.delete(sessionId)
+}
 
 const getChatList = (sessionId, isGroup = false) => {
     const filter = isGroup ? '@g.us' : '@s.whatsapp.net'
@@ -638,27 +596,24 @@ const convertToBase64 = (arrayBytes) => {
     return Buffer.from(byteArray).toString('base64')
 }
 
-const init = async () => {
-    try {
-        const { data, error } = await supabase.storage
-            .from('sessions')
-            .list();
-
-        if (error) {
-            throw error;
+const init = () => {
+    readdir(sessionsDir(), (err, files) => {
+        if (err) {
+            throw err
         }
 
-        for (const item of data) {
-            const sessionId = item.name.split('/')[1];
-            console.log('Recovering session: ' + sessionId);
-            await createSession(sessionId);
-        }
-    } catch (error) {
-        console.error('Error during initialization:', error);
-    }
-};
+        for (const file of files) {
+            if ((!file.startsWith('md_') && !file.startsWith('legacy_')) || file.endsWith('_store')) {
+                continue
+            }
 
-init().catch(console.error);
+            const filename = file.replace('.json', '')
+            const sessionId = filename.substring(3)
+            console.log('Recovering session: ' + sessionId)
+            createSession(sessionId)
+        }
+    })
+}
 
 export {
     isSessionExists,

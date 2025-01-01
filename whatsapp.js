@@ -1,3 +1,4 @@
+import { MongoClient } from 'mongodb';
 import { rmSync, readdir, existsSync } from 'fs'
 import { join } from 'path'
 import pino from 'pino'
@@ -28,6 +29,18 @@ const sessions = new Map()
 const retries = new Map()
 
 const APP_WEBHOOK_ALLOWED_EVENTS = process.env.APP_WEBHOOK_ALLOWED_EVENTS.split(',')
+
+const uri = process.env.MONGODB_URI; // Your MongoDB connection string
+let client;
+let db;
+
+// Initialize MongoDB connection
+const initDB = async () => {
+    client = new MongoClient(uri);
+    await client.connect();
+    db = client.db('wa-api'); // Replace with your database name
+};
+
 
 const sessionsDir = (sessionId = '') => {
     return join(__dirname, 'sessions', sessionId ? sessionId : '')
@@ -93,8 +106,15 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
     const { version, isLatest } = await fetchLatestBaileysVersion()
     console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
 
+    const storedSession = await db.collection('sessions').findOne({ sessionId });
+    if (storedSession) {
+        // Restore session state from MongoDB
+        state.creds = storedSession.state.creds;
+        state.keys = storedSession.state.keys;
+    }
+
     // Load store
-    store?.readFromFile(sessionsDir(`${sessionId}_store.json`))
+    // store?.readFromFile(sessionsDir(`${sessionId}_store.json`))
 
     // Save every 10s
     setInterval(() => {
@@ -138,7 +158,14 @@ const createSession = async (sessionId, res = null, options = { usePairingCode: 
         }
     }
 
-    wa.ev.on('creds.update', saveCreds)
+    wa.ev.on('creds.update', async () => {
+        await db.collection('sessions').updateOne(
+            { sessionId },
+            { $set: { state } },
+            { upsert: true }
+        );
+        saveCreds();
+    });
 
     wa.ev.on('chats.set', ({ chats }) => {
         callWebhook(sessionId, 'CHATS_SET', chats)
@@ -388,16 +415,19 @@ const getListSessions = () => {
     return [...sessions.keys()]
 }
 
-const deleteSession = (sessionId) => {
-    const sessionFile = 'md_' + sessionId
-    const storeFile = `${sessionId}_store.json`
-    const rmOptions = { force: true, recursive: true }
+const deleteSession = async (sessionId) => {
+    await db.collection('sessions').deleteOne({ sessionId });
+    sessions.delete(sessionId);
+    retries.delete(sessionId);
+    // const sessionFile = 'md_' + sessionId
+    // const storeFile = `${sessionId}_store.json`
+    // const rmOptions = { force: true, recursive: true }
 
-    rmSync(sessionsDir(sessionFile), rmOptions)
-    rmSync(sessionsDir(storeFile), rmOptions)
+    // rmSync(sessionsDir(sessionFile), rmOptions)
+    // rmSync(sessionsDir(storeFile), rmOptions)
 
-    sessions.delete(sessionId)
-    retries.delete(sessionId)
+    // sessions.delete(sessionId)
+    // retries.delete(sessionId)
 }
 
 const getChatList = (sessionId, isGroup = false) => {
@@ -596,23 +626,13 @@ const convertToBase64 = (arrayBytes) => {
     return Buffer.from(byteArray).toString('base64')
 }
 
-const init = () => {
-    readdir(sessionsDir(), (err, files) => {
-        if (err) {
-            throw err
-        }
-
-        for (const file of files) {
-            if ((!file.startsWith('md_') && !file.startsWith('legacy_')) || file.endsWith('_store')) {
-                continue
-            }
-
-            const filename = file.replace('.json', '')
-            const sessionId = filename.substring(3)
-            console.log('Recovering session: ' + sessionId)
-            createSession(sessionId)
-        }
-    })
+const init = async () => {
+    await initDB(); // Initialize the database connection
+    const storedSessions = await db.collection('sessions').find().toArray();
+    for (const session of storedSessions) {
+        console.log('Recovering session: ' + session.sessionId);
+        createSession(session.sessionId);
+    }
 }
 
 export {

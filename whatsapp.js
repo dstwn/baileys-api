@@ -45,9 +45,9 @@ const initDB = async () => {
             }
           });
         await client.connect();
-        db = client.db('wa-api'); // Replace with your database name
-        //write log
         console.log('Connected to MongoDB');
+        db = client.db('wa-api'); // Replace with your database name
+        console.log('Database connected:', db.databaseName);
     } catch (error) {
         console.error('Error connecting to MongoDB:', error);
         throw error; // Rethrow the error to handle it in the calling function

@@ -37,7 +37,13 @@ let db;
 // Initialize MongoDB connection
 const initDB = async () => {
     try {
-        client = new MongoClient(uri);
+        client = new MongoClient(uri, {
+            serverApi: {
+              version: ServerApiVersion.v1,
+              strict: true,
+              deprecationErrors: true,
+            }
+          });
         await client.connect();
         db = client.db('wa-api'); // Replace with your database name
         //write log
